@@ -1,0 +1,11 @@
+[Unit]
+Description=Firewall
+After=syslog.target network.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/etc/firewall.bash
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
