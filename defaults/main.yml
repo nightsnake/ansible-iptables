@@ -23,3 +23,7 @@ firewall_log_dropped_packets: true
 # Set to true to ensure other firewall management software is disabled.
 firewall_disable_firewalld: false
 firewall_disable_ufw: false
+
+firewall_default_drop_input: true
+firewall_default_drop_forward: true
+firewall_default_drop_output: false

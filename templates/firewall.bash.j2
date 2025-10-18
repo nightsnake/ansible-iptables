@@ -25,9 +25,21 @@ done
 fi
 
 # Set the default rules.
+{% if firewall_default_drop_input %}
+iptables -P INPUT DROP
+{% else %}
 iptables -P INPUT ACCEPT
+{% endif %}
+{% if firewall_default_drop_forward %}
+iptables -P FORWARD DROP
+{% else %}
 iptables -P FORWARD ACCEPT
+{% endif %}
+{% if firewall_default_drop_output %}
+iptables -P OUTPUT DROP
+{% else %}
 iptables -P OUTPUT ACCEPT
+{% endif %}
 
 {% if firewall_flush_rules_input %}
 iptables -F INPUT
@@ -43,6 +55,9 @@ iptables -F FORWARD
 
 # Accept traffic from loopback interface (localhost).
 iptables -A INPUT -i lo -j ACCEPT
+
+# Allow established connections:
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Forwarded ports.
 {# Add a rule for each forwarded port #}
@@ -67,17 +82,10 @@ iptables -A INPUT -p udp -m udp --dport {{ port }} -j ACCEPT
 # Accept icmp ping requests.
 iptables -A INPUT -p icmp -j ACCEPT
 
-# Allow NTP traffic for time synchronization.
-iptables -A OUTPUT -p udp --dport 123 -j ACCEPT
-iptables -A INPUT -p udp --sport 123 -j ACCEPT
-
 # Additional custom rules.
 {% for rule in firewall_additional_rules %}
 {{ rule }}
 {% endfor %}
-
-# Allow established connections:
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Log EVERYTHING (ONLY for Debug).
 # iptables -A INPUT -j LOG
@@ -86,9 +94,6 @@ iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 # Log other incoming requests (all of which are dropped) at 15/minute max.
 iptables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall: "
 {% endif %}
-
-# Drop all other traffic.
-iptables -A INPUT -j DROP
 
 {% if firewall_enable_ipv6 %}
 # Configure IPv6 if ip6tables is present.
@@ -107,6 +112,9 @@ ip6tables -F FORWARD
   # Accept traffic from loopback interface (localhost).
   ip6tables -A INPUT -i lo -j ACCEPT
 
+  # Allow established connections:
+  ip6tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
   # Open ports.
 {# Add a rule for each open port #}
 {% for port in firewall_allowed_tcp_ports %}
@@ -119,17 +127,10 @@ ip6tables -F FORWARD
   # Accept icmp ping requests.
   ip6tables -A INPUT -p icmpv6 -j ACCEPT
 
-  # Allow NTP traffic for time synchronization.
-  ip6tables -A OUTPUT -p udp --dport 123 -j ACCEPT
-  ip6tables -A INPUT -p udp --sport 123 -j ACCEPT
-
   # Additional custom rules.
 {% for rule in firewall_ip6_additional_rules %}
   {{ rule }}
 {% endfor %}
-
-  # Allow established connections:
-  ip6tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
   # Log EVERYTHING (ONLY for Debug).
   # ip6tables -A INPUT -j LOG
@@ -138,9 +139,6 @@ ip6tables -F FORWARD
   # Log other incoming requests (all of which are dropped) at 15/minute max.
   ip6tables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall: "
 {% endif %}
-
-  # Drop all other traffic.
-  ip6tables -A INPUT -j DROP
 
 fi
 {% endif %}
