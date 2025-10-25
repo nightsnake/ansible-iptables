@@ -2,11 +2,9 @@
 firewall_state: started
 firewall_enabled_at_boot: true
 
-#firewall_flush_rules_and_chains: true
-firewall_flush_rules_input: true
-firewall_flush_rules_output: true
-firewall_flush_rules_forward: true
+firewall_flush_rules_and_chains: true
 
+firewall_template: firewall.bash.j2
 firewall_allowed_tcp_ports:
   - "22"
   - "25"
@@ -19,6 +17,7 @@ firewall_additional_rules: []
 firewall_enable_ipv6: true
 firewall_ip6_additional_rules: []
 firewall_log_dropped_packets: true
+firewall_block_rules: []
 
 # Set to true to ensure other firewall management software is disabled.
 firewall_disable_firewalld: false

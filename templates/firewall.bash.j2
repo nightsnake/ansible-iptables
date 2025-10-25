@@ -41,23 +41,16 @@ iptables -P OUTPUT DROP
 iptables -P OUTPUT ACCEPT
 {% endif %}
 
-{% if firewall_flush_rules_input %}
-iptables -F INPUT
+{% if firewall_flush_rules_and_chains %}
+# Remove all rules and chains.
+iptables -t nat -F
+iptables -t mangle -F
+iptables -F
+iptables -X
 {% endif %}
-{% if firewall_flush_rules_output %}
-iptables -F OUTPUT
-{% endif %}
-{% if firewall_flush_rules_forward %}
-iptables -F FORWARD
-{% endif %}
-
-
 
 # Accept traffic from loopback interface (localhost).
 iptables -A INPUT -i lo -j ACCEPT
-
-# Allow established connections:
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # Forwarded ports.
 {# Add a rule for each forwarded port #}
@@ -70,6 +63,18 @@ iptables -t nat -I PREROUTING -p udp --dport {{ forwarded_port.src }} -j REDIREC
 iptables -t nat -I OUTPUT -p udp -o lo --dport {{ forwarded_port.src }} -j REDIRECT --to-port {{ forwarded_port.dest }}
 {% endfor %}
 
+# Allow established connections:
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Accept icmp ping requests.
+iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+
+# Rules for badasses
+
+{% for rule in firewall_block_rules %}
+{{ rule }}
+{% endfor %}
+
 # Open ports.
 {# Add a rule for each open port #}
 {% for port in firewall_allowed_tcp_ports %}
@@ -79,8 +84,9 @@ iptables -A INPUT -p tcp -m tcp --dport {{ port }} -j ACCEPT
 iptables -A INPUT -p udp -m udp --dport {{ port }} -j ACCEPT
 {% endfor %}
 
-# Accept icmp ping requests.
-iptables -A INPUT -p icmp -j ACCEPT
+  # Allow NTP traffic for time synchronization.
+  iptables -A OUTPUT -p udp --dport 123 -j ACCEPT
+  iptables -A INPUT -p udp --sport 123 -j ACCEPT
 
 # Additional custom rules.
 {% for rule in firewall_additional_rules %}
@@ -95,20 +101,24 @@ iptables -A INPUT -p icmp -j ACCEPT
 iptables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall: "
 {% endif %}
 
+# Drop all other traffic.
+# 
+{% if firewall_default_drop_input %}
+# Default policy is drop
+{% else %}
+iptables -A INPUT -j DROP
+{% endif %}
+
 {% if firewall_enable_ipv6 %}
 # Configure IPv6 if ip6tables is present.
 if [ -x "$(which ip6tables 2>/dev/null)" ]; then
 
+{% if firewall_flush_rules_and_chains %}
+  # Remove all rules and chains.
+  ip6tables -F
+  ip6tables -X
+{% endif %}
 
-{% if firewall_flush_rules_input %}
-ip6tables -F INPUT
-{% endif %}
-{% if firewall_flush_rules_output %}
-ip6tables -F OUTPUT
-{% endif %}
-{% if firewall_flush_rules_forward %}
-ip6tables -F FORWARD
-{% endif %}
   # Accept traffic from loopback interface (localhost).
   ip6tables -A INPUT -i lo -j ACCEPT
 
@@ -124,8 +134,17 @@ ip6tables -F FORWARD
   ip6tables -A INPUT -p udp -m udp --dport {{ port }} -j ACCEPT
 {% endfor %}
 
-  # Accept icmp ping requests.
-  ip6tables -A INPUT -p icmpv6 -j ACCEPT
+  # Accept ICMPv6 message types necessary for SLAAC plus echo request/reply
+  ip6tables -A INPUT -p ipv6-icmp --icmpv6-type 128 -j ACCEPT  # Echo Request
+  ip6tables -A INPUT -p ipv6-icmp --icmpv6-type 129 -j ACCEPT  # Echo Reply
+  ip6tables -A INPUT -p ipv6-icmp --icmpv6-type 133 -j ACCEPT  # Router Solicitation
+  ip6tables -A INPUT -p ipv6-icmp --icmpv6-type 134 -j ACCEPT  # Router Advertisement
+  ip6tables -A INPUT -p ipv6-icmp --icmpv6-type 135 -j ACCEPT  # Neighbor Solicitation
+  ip6tables -A INPUT -p ipv6-icmp --icmpv6-type 136 -j ACCEPT  # Neighbor Advertisement
+
+  # Allow NTP traffic for time synchronization.
+  ip6tables -A OUTPUT -p udp --dport 123 -j ACCEPT
+  ip6tables -A INPUT -p udp --sport 123 -j ACCEPT
 
   # Additional custom rules.
 {% for rule in firewall_ip6_additional_rules %}
@@ -138,6 +157,14 @@ ip6tables -F FORWARD
 {% if firewall_log_dropped_packets %}
   # Log other incoming requests (all of which are dropped) at 15/minute max.
   ip6tables -A INPUT -m limit --limit 15/minute -j LOG --log-level 7 --log-prefix "Dropped by firewall: "
+{% endif %}
+
+# Drop all other traffic.
+# 
+{% if firewall_default_drop_input %}
+# Default policy is drop
+{% else %}
+ip6tables -A INPUT -j DROP
 {% endif %}
 
 fi
