@@ -113,6 +113,23 @@ iptables -A INPUT -j DROP
 # Configure IPv6 if ip6tables is present.
 if [ -x "$(which ip6tables 2>/dev/null)" ]; then
 
+# Set the default rules.
+{% if firewall_default_drop_input %}
+ip6tables -P INPUT DROP
+{% else %}
+ip6tables -P INPUT ACCEPT
+{% endif %}
+{% if firewall_default_drop_forward %}
+ip6tables -P FORWARD DROP
+{% else %}
+ip6tables -P FORWARD ACCEPT
+{% endif %}
+{% if firewall_default_drop_output %}
+ip6tables -P OUTPUT DROP
+{% else %}
+ip6tables -P OUTPUT ACCEPT
+{% endif %}
+
 {% if firewall_flush_rules_and_chains %}
   # Remove all rules and chains.
   ip6tables -F
